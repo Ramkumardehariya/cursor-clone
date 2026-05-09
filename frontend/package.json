@@ -1,0 +1,62 @@
+{
+  "name": "cursor-clone-frontend",
+  "version": "1.0.0",
+  "description": "AI Code Editor Frontend - Cursor Clone",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:debug": "vite --debug",
+    "build": "vite build",
+    "build:analyze": "vite build --analyze",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext js,jsx --fix",
+    "preview": "vite preview",
+    "test": "echo \"Testing not configured yet\"",
+    "test:watch": "npm test -- --watch",
+    "type-check": "echo \"TypeScript not enabled\""
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "axios": "^1.6.2",
+    "clsx": "^2.0.0",
+    "framer-motion": "^10.16.16",
+    "monaco-editor": "^0.45.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-icons": "^4.12.0",
+    "react-markdown": "^9.0.1",
+    "react-resizable-panels": "^2.0.19",
+    "react-router-dom": "^6.20.1",
+    "react-split-pane": "^3.2.0",
+    "react-syntax-highlighter": "^15.5.0",
+    "rehype-highlight": "^7.0.0",
+    "remark-gfm": "^4.0.0",
+    "socket.io-client": "^4.7.4",
+    "tailwind-merge": "^2.2.0",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "vite": "^5.0.8"
+  },
+  "keywords": [
+    "ai",
+    "code-editor",
+    "cursor",
+    "react",
+    "monaco"
+  ],
+  "author": "Ramkumar Dehariya",
+  "license": "MIT"
+}
