@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { workspaceAPI } from '../services/api';
-import debug from '../utils/debug';
+import debug, { createPerformanceMonitor } from '../utils/debug';
 
 const useWorkspaceStore = create((set, get) => ({
   // State
@@ -12,7 +12,7 @@ const useWorkspaceStore = create((set, get) => ({
   // Actions
   fetchWorkspaces: async () => {
     debug.store('workspace', 'fetchWorkspaces:start');
-    const monitor = debug.createPerformanceMonitor('fetchWorkspaces');
+    const monitor = createPerformanceMonitor('fetchWorkspaces');
     
     set({ isLoading: true, error: null });
     try {
@@ -59,7 +59,7 @@ const useWorkspaceStore = create((set, get) => ({
 
   fetchWorkspace: async (workspaceId) => {
     debug.store('workspace', 'fetchWorkspace:start', workspaceId);
-    const monitor = debug.createPerformanceMonitor('fetchWorkspace');
+    const monitor = createPerformanceMonitor('fetchWorkspace');
     
     set({ isLoading: true, error: null });
     try {
