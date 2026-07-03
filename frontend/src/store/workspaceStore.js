@@ -28,32 +28,14 @@ const useWorkspaceStore = create((set, get) => ({
       monitor.end();
       return data;
     } catch (error) {
-      debug.error('workspace', 'Failed to fetch workspaces');
-      // Use fallback data instead of failing
-      const fallbackWorkspaces = [
-        {
-          _id: 'default',
-          name: 'Default Workspace',
-          description: 'A default workspace for development',
-          createdAt: new Date().toISOString(),
-          lastAccessed: new Date().toISOString(),
-          settings: {
-            theme: 'dark',
-            fontSize: 14,
-            tabSize: 4
-          }
-        }
-      ];
-      
-      debug.info('workspace', 'Using fallback workspaces');
+      debug.error('workspace', 'Failed to fetch workspaces', error);
       set({
-        workspaces: fallbackWorkspaces,
-        error: null, // Don't show error to user
+        error: error.response?.data?.error || 'Failed to fetch workspaces',
         isLoading: false
       });
       
       monitor.end();
-      return fallbackWorkspaces;
+      throw error;
     }
   },
 
@@ -75,37 +57,21 @@ const useWorkspaceStore = create((set, get) => ({
       monitor.end();
       return data;
     } catch (error) {
-      debug.error('workspace', 'Failed to fetch workspace');
-      // Use fallback workspace
-      const fallbackWorkspace = {
-        _id: workspaceId || 'default',
-        name: 'Default Workspace',
-        description: 'A default workspace for development',
-        createdAt: new Date().toISOString(),
-        lastAccessed: new Date().toISOString(),
-        settings: {
-          theme: 'dark',
-          fontSize: 14,
-          tabSize: 4
-        }
-      };
-      
-      debug.info('workspace', 'Using fallback workspace');
+      debug.error('workspace', 'Failed to fetch workspace', error);
       set({
-        currentWorkspace: fallbackWorkspace,
-        error: null, // Don't show error to user
+        error: error.response?.data?.error || 'Failed to fetch workspace',
         isLoading: false
       });
       
       monitor.end();
-      return fallbackWorkspace;
+      throw error;
     }
   },
 
   createWorkspace: async (workspaceData) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.post('/workspaces', workspaceData);
+      const response = await workspaceAPI.createWorkspace(workspaceData);
       const { data } = response.data;
       
       set((state) => ({
@@ -130,7 +96,7 @@ const useWorkspaceStore = create((set, get) => ({
   updateWorkspace: async (workspaceId, workspaceData) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.put(`/workspaces/${workspaceId}`, workspaceData);
+      const response = await workspaceAPI.updateWorkspace(workspaceId, workspaceData);
       const { data } = response.data;
       
       set((state) => ({
@@ -159,7 +125,7 @@ const useWorkspaceStore = create((set, get) => ({
   deleteWorkspace: async (workspaceId) => {
     set({ isLoading: true, error: null });
     try {
-      await api.delete(`/workspaces/${workspaceId}`);
+      await workspaceAPI.deleteWorkspace(workspaceId);
       
       set((state) => ({
         workspaces: state.workspaces.filter(w => w._id !== workspaceId),

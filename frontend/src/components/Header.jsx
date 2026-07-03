@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   FiMenu, 
   FiSearch, 
@@ -12,23 +13,54 @@ import {
   FiMoon
 } from 'react-icons/fi';
 import useAuthStore from '../store/authStore';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const navigate = useNavigate();
+  const profileMenuRef = useRef(null);
+  const notificationsRef = useRef(null);
+  const { isDarkMode, toggleTheme } = useTheme();
   
   const { logout, updateProfile } = useAuthStore();
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   const handleLogout = async () => {
     await logout();
     setShowProfileMenu(false);
-  };
-
-  const toggleTheme = () => {
-    const newTheme = !isDarkMode;
-    setIsDarkMode(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme);
+    navigate('/auth/login');
   };
 
   const notifications = [
@@ -40,12 +72,12 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <header className="bg-editor-toolbar border-b border-editor-border h-14 flex items-center justify-between px-4">
+    <header className="bg-editor-toolbar dark:bg-editor-toolbar border-b border-editor-border dark:border-editor-border h-14 flex items-center justify-between px-4">
       {/* Left side */}
       <div className="flex items-center space-x-4">
         <button
           onClick={onToggleSidebar}
-          className="p-2 rounded-lg hover:bg-editor-hover text-editor-text transition-colors"
+          className="p-2 rounded-lg hover:bg-editor-hover dark:hover:bg-editor-hover text-editor-text dark:text-editor-text transition-colors"
         >
           <FiMenu size={18} />
         </button>
@@ -54,9 +86,9 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
           <input
             type="text"
             placeholder="Search files, commands, or AI prompts..."
-            className="w-64 lg:w-96 bg-editor-sidebar border border-editor-border rounded-lg px-3 py-1.5 text-sm text-editor-text placeholder-editor-text-dim focus:outline-none focus:border-editor-accent focus:ring-1 focus:ring-editor-accent"
+            className="w-64 lg:w-96 bg-editor-sidebar dark:bg-editor-sidebar border border-editor-border dark:border-editor-border rounded-lg px-3 py-1.5 text-sm text-editor-text dark:text-editor-text placeholder-editor-text-dim dark:placeholder-editor-text-dim focus:outline-none focus:border-editor-accent dark:focus:border-editor-accent focus:ring-1 focus:ring-editor-accent dark:focus:ring-editor-accent"
           />
-          <FiSearch className="absolute right-3 top-1/2 transform -translate-y-1/2 text-editor-text-dim" size={16} />
+          <FiSearch className="absolute right-3 top-1/2 transform -translate-y-1/2 text-editor-text-dim dark:text-editor-text-dim" size={16} />
         </div>
       </div>
 
@@ -65,17 +97,17 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-editor-hover text-editor-text transition-colors"
+          className="p-2 rounded-lg hover:bg-editor-hover dark:hover:bg-editor-hover text-editor-text dark:text-editor-text transition-colors"
           title="Toggle theme"
         >
           {isDarkMode ? <FiSun size={18} /> : <FiMoon size={18} />}
         </button>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notificationsRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2 rounded-lg hover:bg-editor-hover text-editor-text transition-colors relative"
+            className="p-2 rounded-lg hover:bg-editor-hover dark:hover:bg-editor-hover text-editor-text dark:text-editor-text transition-colors relative"
           >
             <FiBell size={18} />
             {unreadCount > 0 && (
@@ -89,23 +121,23 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute right-0 mt-2 w-80 bg-editor-sidebar border border-editor-border rounded-lg shadow-lg z-50"
+                className="absolute right-0 mt-2 w-80 bg-editor-sidebar dark:bg-editor-sidebar border border-editor-border dark:border-editor-border rounded-lg shadow-lg z-50"
               >
-                <div className="p-3 border-b border-editor-border">
-                  <h3 className="font-semibold text-editor-text">Notifications</h3>
+                <div className="p-3 border-b border-editor-border dark:border-editor-border">
+                  <h3 className="font-semibold text-editor-text dark:text-editor-text">Notifications</h3>
                 </div>
                 <div className="max-h-96 overflow-y-auto">
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-3 hover:bg-editor-hover cursor-pointer border-b border-editor-border last:border-b-0 ${
+                      className={`p-3 hover:bg-editor-hover dark:hover:bg-editor-hover cursor-pointer border-b border-editor-border dark:border-editor-border last:border-b-0 ${
                         !notification.read ? 'bg-blue-900/20' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-sm text-editor-text">{notification.title}</p>
-                          <p className="text-xs text-editor-text-dim mt-1">{notification.time}</p>
+                          <p className="text-sm text-editor-text dark:text-editor-text">{notification.title}</p>
+                          <p className="text-xs text-editor-text-dim dark:text-editor-text-dim mt-1">{notification.time}</p>
                         </div>
                         {!notification.read && (
                           <div className="w-2 h-2 bg-blue-500 rounded-full mt-1"></div>
@@ -120,18 +152,18 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
         </div>
 
         {/* Profile Menu */}
-        <div className="relative">
+        <div className="relative" ref={profileMenuRef}>
           <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="flex items-center space-x-2 p-2 rounded-lg hover:bg-editor-hover transition-colors"
+            className="flex items-center space-x-2 p-2 rounded-lg hover:bg-editor-hover dark:hover:bg-editor-hover transition-colors"
           >
-            <div className="w-6 h-6 bg-editor-accent rounded-full flex items-center justify-center">
+            <div className="w-6 h-6 bg-editor-accent dark:bg-editor-accent rounded-full flex items-center justify-center">
               <FiUser size={14} className="text-white" />
             </div>
-            <span className="text-sm text-editor-text hidden md:block">
+            <span className="text-sm text-editor-text dark:text-editor-text hidden md:block">
               {user?.name || 'User'}
             </span>
-            <FiChevronDown size={14} className="text-editor-text-dim" />
+            <FiChevronDown size={14} className="text-editor-text-dim dark:text-editor-text-dim" />
           </button>
 
           <AnimatePresence>
@@ -140,11 +172,11 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute right-0 mt-2 w-56 bg-editor-sidebar border border-editor-border rounded-lg shadow-lg z-50"
+                className="absolute right-0 mt-2 w-56 bg-editor-sidebar dark:bg-editor-sidebar border border-editor-border dark:border-editor-border rounded-lg shadow-lg z-50"
               >
-                <div className="p-3 border-b border-editor-border">
-                  <p className="font-semibold text-editor-text">{user?.name}</p>
-                  <p className="text-sm text-editor-text-dim">{user?.email}</p>
+                <div className="p-3 border-b border-editor-border dark:border-editor-border">
+                  <p className="font-semibold text-editor-text dark:text-editor-text">{user?.name}</p>
+                  <p className="text-sm text-editor-text-dim dark:text-editor-text-dim">{user?.email}</p>
                 </div>
                 
                 <div className="py-2">
@@ -153,7 +185,7 @@ const Header = ({ user, sidebarCollapsed, onToggleSidebar }) => {
                       // Navigate to settings
                       setShowProfileMenu(false);
                     }}
-                    className="w-full px-4 py-2 text-left text-sm text-editor-text hover:bg-editor-hover flex items-center space-x-2"
+                    className="w-full px-4 py-2 text-left text-sm text-editor-text dark:text-editor-text hover:bg-editor-hover dark:hover:bg-editor-hover flex items-center space-x-2"
                   >
                     <FiSettings size={16} />
                     <span>Settings</span>

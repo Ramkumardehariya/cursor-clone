@@ -1,6 +1,95 @@
 import { create } from 'zustand';
 import api from '../services/api';
 
+const getAuthToken = () => {
+  const authStorage = localStorage.getItem('auth-storage');
+  if (!authStorage) return '';
+
+  try {
+    return JSON.parse(authStorage)?.state?.token || '';
+  } catch (error) {
+    console.error('Failed to parse auth token from local storage', error);
+    return '';
+  }
+};
+
+const readErrorResponse = async (response) => {
+  const contentType = response.headers.get('content-type') || '';
+
+  try {
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      return data.error || data.message || `Request failed with ${response.status}`;
+    }
+
+    const text = await response.text();
+    return text || `Request failed with ${response.status}`;
+  } catch (error) {
+    console.error('Failed to parse AI error response', error);
+    return `Request failed with ${response.status}`;
+  }
+};
+
+const getNetworkErrorMessage = (error) => {
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return `Backend API is unreachable at ${api.defaults.baseURL}. Start the backend server and try again.`;
+  }
+
+  return error.message || 'Failed to send message';
+};
+
+const extractAssistantContent = (payload) => {
+  const data = payload?.data || payload;
+  const message = data?.message || data?.messages?.at?.(-1);
+
+  return (
+    data?.content ||
+    data?.response ||
+    data?.reply ||
+    data?.text ||
+    data?.answer ||
+    message?.content ||
+    ''
+  );
+};
+
+const finalizeAssistantMessage = (set, { content, chatId, title, timestamp }) => {
+  set((state) => {
+    let finalizedExistingMessage = false;
+    const messages = state.messages.map((msg) => {
+      if (msg.role === 'assistant' && msg.isStreaming) {
+        finalizedExistingMessage = true;
+        return {
+          ...msg,
+          content,
+          timestamp: timestamp || msg.timestamp || new Date(),
+          isStreaming: false
+        };
+      }
+
+      return msg;
+    });
+
+    if (!finalizedExistingMessage && content) {
+      messages.push({
+        role: 'assistant',
+        content,
+        timestamp: timestamp || new Date()
+      });
+    }
+
+    return {
+      messages,
+      currentChat: chatId ? { _id: chatId, title } : state.currentChat,
+      chats: chatId && !state.chats.some((chat) => chat._id === chatId)
+        ? [{ _id: chatId, title, lastMessageAt: new Date() }, ...state.chats]
+        : state.chats,
+      isLoading: false,
+      isStreaming: false
+    };
+  });
+};
+
 const useChatStore = create((set, get) => ({
   // State
   chats: [],
@@ -69,55 +158,88 @@ const useChatStore = create((set, get) => ({
     }));
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/ai/chat`, {
+      const token = getAuthToken();
+      const response = await fetch(`${api.defaults.baseURL}/ai/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage')).state.token : ''}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           message,
           workspaceId,
-          chatId,
+          ...(chatId ? { chatId } : {}),
           ...options
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error(await readErrorResponse(response));
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        const payload = await response.json();
+        const assistantContent = extractAssistantContent(payload);
+
+        if (!assistantContent) {
+          throw new Error('AI response did not include a message');
+        }
+
+        finalizeAssistantMessage(set, {
+          content: assistantContent,
+          chatId: payload?.data?.chatId || payload?.chatId,
+          title: payload?.data?.title || payload?.title,
+          timestamp: payload?.data?.timestamp || payload?.timestamp || new Date()
+        });
+
+        return {
+          success: true,
+          chatId: payload?.data?.chatId || payload?.chatId
+        };
+      }
+
+      if (!response.body) {
+        throw new Error('AI response stream was empty');
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
+      let sseBuffer = '';
+      let completed = false;
 
       while (true) {
         const { done, value } = await reader.read();
         
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        sseBuffer += decoder.decode(value, { stream: true });
+        const events = sseBuffer.split('\n\n');
+        sseBuffer = events.pop() || '';
         
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
+        for (const event of events) {
+          const dataLine = event
+            .split('\n')
+            .find((line) => line.startsWith('data: '));
+
+          if (dataLine) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const data = JSON.parse(dataLine.slice(6));
               
               if (data.isComplete) {
-                // Add final assistant message
-                const finalMessage = {
-                  role: 'assistant',
-                  content: assistantMessage,
-                  timestamp: new Date()
-                };
-                
-                set((state) => ({
-                  messages: [...state.messages, finalMessage],
-                  currentChat: data.chatId ? { _id: data.chatId, title: data.title } : state.currentChat,
-                  isLoading: false,
-                  isStreaming: false
-                }));
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+
+                completed = true;
+                finalizeAssistantMessage(set, {
+                  content: data.message?.content || assistantMessage,
+                  chatId: data.chatId,
+                  title: data.title,
+                  timestamp: data.message?.timestamp || new Date()
+                });
                 
                 return { success: true, chatId: data.chatId };
               } else if (data.content) {
@@ -129,7 +251,10 @@ const useChatStore = create((set, get) => ({
                   const lastMessage = newMessages[newMessages.length - 1];
                   
                   if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-                    lastMessage.content = assistantMessage;
+                    newMessages[newMessages.length - 1] = {
+                      ...lastMessage,
+                      content: assistantMessage
+                    };
                   } else {
                     newMessages.push({
                       role: 'assistant',
@@ -145,21 +270,44 @@ const useChatStore = create((set, get) => ({
                 throw new Error(data.error);
               }
             } catch (parseError) {
-              console.error('Parse error:', parseError);
+              if (parseError instanceof SyntaxError) {
+                console.error('Failed to parse AI stream event', { event, error: parseError });
+              } else {
+                throw parseError;
+              }
             }
           }
         }
       }
+
+      if (sseBuffer.trim()) {
+        console.warn('AI stream ended with an incomplete SSE frame', { sseBuffer });
+      }
+
+      if (!completed) {
+        throw new Error('AI response stream ended before completion');
+      }
     } catch (error) {
+      const errorMessage = getNetworkErrorMessage(error);
+
+      console.error('AI chat request failed', {
+        message: errorMessage,
+        originalMessage: error.message,
+        apiBaseURL: api.defaults.baseURL,
+        workspaceId,
+        chatId
+      });
+
       set({
-        error: error.message || 'Failed to send message',
+        error: errorMessage,
         isLoading: false,
-        isStreaming: false
+        isStreaming: false,
+        messages: get().messages.filter((msg) => !msg.isStreaming)
       });
       
       return { 
         success: false, 
-        error: error.message || 'Failed to send message' 
+        error: errorMessage
       };
     }
   },

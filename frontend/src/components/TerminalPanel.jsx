@@ -103,11 +103,11 @@ const TerminalPanel = ({ workspaceId, onClose }) => {
 
   return (
     <motion.div
-      initial={{ height: 300, opacity: 0 }}
-      animate={{ height: isMinimized ? 40 : 300, opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="bg-editor-bg border-t border-editor-border flex flex-col"
+      className="bg-editor-bg flex h-full flex-col"
     >
       {/* Header */}
       <div className="panel-header flex items-center justify-between">

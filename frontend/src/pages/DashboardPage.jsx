@@ -5,11 +5,12 @@ import { FiPlus, FiFolder, FiFile, FiClock, FiZap, FiCode, FiMessageSquare, FiTe
 import useWorkspaceStore from '../store/workspaceStore';
 import useAuthStore from '../store/authStore';
 import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { workspaces, fetchWorkspaces, createWorkspace, isLoading } = useWorkspaceStore();
+  const { workspaces, fetchWorkspaces, createWorkspace, isLoading, error } = useWorkspaceStore();
   const [stats, setStats] = useState({
     totalWorkspaces: 0,
     totalFiles: 0,
@@ -19,23 +20,22 @@ const DashboardPage = () => {
 
   useEffect(() => {
     fetchWorkspaces();
-  }, [fetchWorkspaces]);
+  }, []);
 
   useEffect(() => {
     if (workspaces.length > 0) {
-      // Calculate mock stats
-      const totalFiles = workspaces.reduce((acc, ws) => acc + Math.floor(Math.random() * 20), 0);
-      const totalChats = workspaces.reduce((acc, ws) => acc + Math.floor(Math.random() * 10), 0);
-      
       setStats({
         totalWorkspaces: workspaces.length,
-        totalFiles,
-        totalChats,
-        recentActivity: [
-          { type: 'file', name: 'App.jsx', time: '2 hours ago', workspace: 'My Project' },
-          { type: 'chat', name: 'AI Chat', time: '5 hours ago', workspace: 'My Project' },
-          { type: 'workspace', name: 'New Workspace', time: '1 day ago', workspace: 'React App' },
-        ]
+        totalFiles: 0, // Will be fetched from API when available
+        totalChats: 0, // Will be fetched from API when available
+        recentActivity: [] // Will be fetched from API when available
+      });
+    } else {
+      setStats({
+        totalWorkspaces: 0,
+        totalFiles: 0,
+        totalChats: 0,
+        recentActivity: []
       });
     }
   }, [workspaces]);
@@ -45,7 +45,10 @@ const DashboardPage = () => {
     if (name) {
       const result = await createWorkspace({ name });
       if (result.success) {
-        navigate(`/workspace/${result.data._id}`);
+        toast.success('Workspace created successfully!');
+        // Stay on dashboard to show the new workspace in the list
+      } else {
+        toast.error(result.error || 'Failed to create workspace');
       }
     }
   };
@@ -69,6 +72,19 @@ const DashboardPage = () => {
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingSpinner size="large" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">{error}</p>
+          <button onClick={fetchWorkspaces} className="btn-primary">
+            Retry
+          </button>
+        </div>
       </div>
     );
   }

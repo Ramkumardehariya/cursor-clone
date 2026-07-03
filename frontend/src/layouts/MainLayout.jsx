@@ -10,13 +10,13 @@ const MainLayout = () => {
   const { user } = useAuthStore();
 
   return (
-    <div className="flex h-screen bg-editor-bg">
+    <div className="flex h-screen bg-editor-bg dark:bg-editor-bg">
       {/* Sidebar */}
       <motion.div
         initial={false}
         animate={{ width: sidebarCollapsed ? 60 : 240 }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="bg-editor-sidebar border-r border-editor-border flex-shrink-0"
+        className="bg-editor-sidebar dark:bg-editor-sidebar border-r border-editor-border dark:border-editor-border flex-shrink-0"
       >
         <Sidebar 
           collapsed={sidebarCollapsed}

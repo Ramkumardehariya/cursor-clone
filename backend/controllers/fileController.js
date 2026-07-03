@@ -3,12 +3,62 @@ const Workspace = require('../models/Workspace');
 const { validationResult } = require('express-validator');
 const path = require('path');
 
+function toId(value) {
+  if (!value) return null;
+  return value._id ? value._id.toString() : value.toString();
+}
+
+function buildChildPath(parentPath, name) {
+  if (!parentPath || parentPath === '/') {
+    return `/${name}`;
+  }
+
+  return `${parentPath.replace(/\/$/, '')}/${name}`;
+}
+
+async function updateDescendantPaths(parentId, parentPath) {
+  const children = await File.find({ parentId, isDeleted: false });
+
+  for (const child of children) {
+    const childPath = buildChildPath(parentPath, child.name);
+    child.path = childPath;
+    await child.save();
+
+    if (child.isFolder) {
+      await updateDescendantPaths(child._id, childPath);
+    }
+  }
+}
+
+async function isDescendantFolder(folderId, possibleAncestorId) {
+  let current = await File.findById(folderId).select('parentId');
+
+  while (current?.parentId) {
+    const currentParentId = current.parentId.toString();
+    if (currentParentId === possibleAncestorId.toString()) {
+      return true;
+    }
+
+    current = await File.findById(current.parentId).select('parentId');
+  }
+
+  return false;
+}
+
 // @desc    Get all files in a workspace
 // @route   GET /api/files/workspace/:workspaceId
 // @access  Private
 const getWorkspaceFiles = async (req, res) => {
   try {
     const { workspaceId } = req.params;
+    
+    // Handle 'default' workspace ID gracefully
+    if (workspaceId === 'default') {
+      return res.status(404).json({
+        success: false,
+        error: 'Default workspace is not supported. Please create a real workspace.'
+      });
+    }
     
     // Verify workspace belongs to user
     const workspace = await Workspace.findOne({
@@ -102,7 +152,8 @@ const createFile = async (req, res) => {
       });
     }
 
-    const { name, workspaceId, content, language, path: filePath, isFolder, parentId } = req.body;
+    const { name, workspaceId, content, language, path: filePath, isFolder } = req.body;
+    const parentId = req.body.parentId || null;
 
     // Verify workspace belongs to user
     const workspace = await Workspace.findOne({
@@ -118,11 +169,29 @@ const createFile = async (req, res) => {
       });
     }
 
+    let parentFolder = null;
+
+    if (parentId) {
+      parentFolder = await File.findOne({
+        _id: parentId,
+        workspaceId,
+        isFolder: true,
+        isDeleted: false
+      });
+
+      if (!parentFolder) {
+        return res.status(400).json({
+          success: false,
+          error: 'Parent folder not found'
+        });
+      }
+    }
+
     // Check if file/folder already exists in the same location
     const existingFile = await File.findOne({
       name,
       workspaceId,
-      parentId: parentId || null,
+      parentId,
       isDeleted: false
     });
 
@@ -133,12 +202,17 @@ const createFile = async (req, res) => {
       });
     }
 
+    // Build the correct path based on the saved parent relationship.
+    const finalPath = parentFolder
+      ? buildChildPath(parentFolder.path, name)
+      : (filePath || `/${name}`);
+
     const fileData = {
       name,
       workspaceId,
-      path: filePath || `/${name}`,
+      path: finalPath,
       isFolder: isFolder || false,
-      parentId: parentId || null
+      parentId
     };
 
     if (!isFolder) {
@@ -473,7 +547,7 @@ const moveFile = async (req, res) => {
       });
     }
 
-    const { newParentId } = req.body;
+    const newParentId = req.body.newParentId || null;
 
     const file = await File.findById(req.params.id)
       .populate('workspaceId', 'userId');
@@ -493,6 +567,20 @@ const moveFile = async (req, res) => {
       });
     }
 
+    if (file.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'File has been deleted'
+      });
+    }
+
+    if (file.isFolder && file.path === '/' && !file.parentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot move the workspace root folder'
+      });
+    }
+
     // Check if moving to itself (prevent circular reference)
     if (newParentId === file._id.toString()) {
       return res.status(400).json({
@@ -501,22 +589,46 @@ const moveFile = async (req, res) => {
       });
     }
 
+    let destination = null;
+
     // Check if destination exists and is a folder
     if (newParentId) {
-      const destination = await File.findById(newParentId);
-      if (!destination || !destination.isFolder) {
+      destination = await File.findById(newParentId);
+      if (
+        !destination ||
+        destination.isDeleted ||
+        !destination.isFolder ||
+        destination.workspaceId.toString() !== file.workspaceId._id.toString()
+      ) {
         return res.status(400).json({
           success: false,
           error: 'Destination folder not found'
         });
       }
+
+      if (file.isFolder && await isDescendantFolder(destination._id, file._id)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot move a folder into one of its descendants'
+        });
+      }
+    }
+
+    if (toId(file.parentId) === newParentId) {
+      const unchangedFile = await File.findById(file._id)
+        .populate('parentId', 'name path isFolder');
+
+      return res.json({
+        success: true,
+        data: unchangedFile
+      });
     }
 
     // Check if file with same name already exists in destination
     const existingFile = await File.findOne({
       name: file.name,
       workspaceId: file.workspaceId._id,
-      parentId: newParentId,
+      parentId: newParentId || null,
       _id: { $ne: req.params.id },
       isDeleted: false
     });
@@ -528,11 +640,22 @@ const moveFile = async (req, res) => {
       });
     }
 
+    const newPath = destination
+      ? buildChildPath(destination.path, file.name)
+      : `/${file.name}`;
+
     const updatedFile = await File.findByIdAndUpdate(
       req.params.id,
-      { parentId: newParentId },
+      {
+        parentId: newParentId,
+        path: newPath
+      },
       { new: true, runValidators: true }
-    ).populate('parentId', 'name path');
+    ).populate('parentId', 'name path isFolder');
+
+    if (updatedFile.isFolder) {
+      await updateDescendantPaths(updatedFile._id, updatedFile.path);
+    }
 
     res.json({
       success: true,

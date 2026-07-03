@@ -129,11 +129,11 @@ const AIChatPanel = ({ workspaceId, onClose }) => {
 
   return (
     <motion.div
-      initial={{ width: 400, opacity: 0 }}
-      animate={{ width: isMinimized ? 60 : 400, opacity: 1 }}
-      exit={{ width: 0, opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
-      className="bg-editor-sidebar border-l border-editor-border flex flex-col h-full"
+      className="bg-editor-sidebar border-l border-editor-border flex h-full w-full flex-col"
     >
       {/* Header */}
       <div className="panel-header flex items-center justify-between">

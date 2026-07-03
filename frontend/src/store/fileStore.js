@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { fileAPI } from '../services/api';
-import debug from '../utils/debug';
+import debug, { createPerformanceMonitor } from '../utils/debug';
 
 const useFileStore = create((set, get) => ({
   // State
@@ -10,33 +10,46 @@ const useFileStore = create((set, get) => ({
   fileTree: [],
   isLoading: false,
   error: null,
+  lastFetchedWorkspaceId: null,
 
   // Actions
-  fetchFiles: async (workspaceId) => {
+  fetchFiles: async (workspaceId, options = {}) => {
+    const { force = false } = options;
+    const state = get();
+
+    if (!workspaceId) {
+      return [];
+    }
+
+    if (!force && state.lastFetchedWorkspaceId === workspaceId && state.files.length > 0) {
+      debug.store('file', 'fetchFiles:skipped', workspaceId, 'already fetched');
+      return state.files;
+    }
+
     debug.store('file', 'fetchFiles:start', workspaceId);
-    const monitor = debug.createPerformanceMonitor('fetchFiles');
-    
-    set({ isLoading: true, error: null });
+    const monitor = createPerformanceMonitor('fetchFiles');
+
+    set({ isLoading: true, error: null, lastFetchedWorkspaceId: workspaceId });
     try {
       const response = await fileAPI.getWorkspaceFiles(workspaceId);
       const { data } = response.data;
-      
+
       debug.success('file', `Fetched ${data.length} files`);
       set({
         files: data,
         fileTree: buildFileTree(data),
         isLoading: false
       });
-      
+
       monitor.end();
       return data;
     } catch (error) {
-      debug.error('file', 'Failed to fetch files');
+      console.error('Failed to fetch files:', error);
+      debug.error('file', error?.response?.data?.error || error?.message || 'Failed to fetch files');
       set({
-        error: error.response?.data?.error || 'Failed to fetch files',
+        error: error.response?.data?.error || error?.message || 'Failed to fetch files',
         isLoading: false
       });
-      
       monitor.end();
       return [];
     }
@@ -68,22 +81,28 @@ const useFileStore = create((set, get) => ({
     try {
       const response = await fileAPI.createFile(fileData);
       const { data } = response.data;
-      
-      set((state) => ({
-        files: [...state.files, data],
-        fileTree: buildFileTree([...state.files, data]),
-        isLoading: false
-      }));
-      
+
+      set((state) => {
+        const files = [...state.files, data];
+        return {
+          files,
+          fileTree: buildFileTree(files),
+          isLoading: false
+        };
+      });
+
+      const workspaceId = fileData.workspaceId;
+      await get().fetchFiles(workspaceId, { force: true });
+
       return { success: true, data };
     } catch (error) {
       set({
         error: error.response?.data?.error || 'Failed to create file',
         isLoading: false
       });
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Failed to create file' 
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create file'
       };
     }
   },
@@ -176,6 +195,43 @@ const useFileStore = create((set, get) => ({
     }
   },
 
+  moveFile: async (fileId, newParentId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fileAPI.moveFile(fileId, newParentId || null);
+      const { data } = response.data;
+
+      set((state) => {
+        const files = state.files.map(f => f._id === fileId ? data : f);
+        return {
+          files,
+          fileTree: buildFileTree(files),
+          openFiles: state.openFiles.map(f => f._id === fileId ? data : f),
+          activeFile: state.activeFile?._id === fileId ? data : state.activeFile,
+          isLoading: false
+        };
+      });
+
+      const movedWorkspaceId = data.workspaceId && typeof data.workspaceId === 'object'
+        ? data.workspaceId._id
+        : data.workspaceId;
+      if (movedWorkspaceId || get().lastFetchedWorkspaceId) {
+        await get().fetchFiles(movedWorkspaceId || get().lastFetchedWorkspaceId, { force: true });
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      set({
+        error: error.response?.data?.error || 'Failed to move file',
+        isLoading: false
+      });
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to move file'
+      };
+    }
+  },
+
   openFile: (file) => {
     set((state) => {
       const isOpen = state.openFiles.some(f => f._id === file._id);
@@ -237,17 +293,40 @@ function buildFileTree(files) {
 
   // Create a map of files
   files.forEach(file => {
-    map[file._id] = { ...file, children: [] };
+    if (file?._id) {
+      map[file._id] = { ...file, children: [] };
+    }
   });
 
   // Build the tree structure
   files.forEach(file => {
-    if (file.parentId && map[file.parentId]) {
-      map[file.parentId].children.push(map[file._id]);
-    } else if (!file.parentId) {
+    if (!file?._id) return;
+
+    const parentId = file.parentId && typeof file.parentId === 'object'
+      ? file.parentId._id
+      : file.parentId;
+    const parentKey = parentId ? parentId.toString() : null;
+
+    if (parentKey && map[parentKey]) {
+      map[parentKey].children.push(map[file._id]);
+    } else if (!parentKey) {
       tree.push(map[file._id]);
     }
   });
+
+  const sortNodes = (nodes) => {
+    nodes.sort((a, b) => {
+      if (a.isFolder !== b.isFolder) {
+        return a.isFolder ? -1 : 1;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+
+    nodes.forEach(node => sortNodes(node.children));
+  };
+
+  sortNodes(tree);
 
   return tree;
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   FiHome, 
@@ -13,20 +13,28 @@ import {
 } from 'react-icons/fi';
 import useAuthStore from '../store/authStore';
 import useWorkspaceStore from '../store/workspaceStore';
+import toast from 'react-hot-toast';
 
 const Sidebar = ({ collapsed, onToggleCollapse }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { logout } = useAuthStore();
   const { workspaces, createWorkspace } = useWorkspaceStore();
 
   const handleLogout = async () => {
     await logout();
+    navigate('/auth/login');
   };
 
   const handleCreateWorkspace = async () => {
     const workspaceName = prompt('Enter workspace name:');
     if (workspaceName) {
-      await createWorkspace({ name: workspaceName });
+      const result = await createWorkspace({ name: workspaceName });
+      if (result.success) {
+        toast.success('Workspace created successfully!');
+      } else {
+        toast.error(result.error || 'Failed to create workspace');
+      }
     }
   };
 
@@ -37,9 +45,9 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-editor-sidebar">
+    <div className="h-full flex flex-col bg-editor-sidebar dark:bg-editor-sidebar">
       {/* Header */}
-      <div className="p-4 border-b border-editor-border">
+      <div className="p-4 border-b border-editor-border dark:border-editor-border">
         <div className="flex items-center justify-between">
           <motion.h1
             initial={{ opacity: 1 }}
@@ -51,7 +59,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
           </motion.h1>
           <button
             onClick={onToggleCollapse}
-            className="p-1 rounded hover:bg-editor-hover text-editor-text-dim hover:text-editor-text transition-colors"
+            className="p-1 rounded hover:bg-editor-hover dark:hover:bg-editor-hover text-editor-text-dim dark:text-editor-text-dim hover:text-editor-text dark:hover:text-editor-text transition-colors"
           >
             {collapsed ? <FiChevronRight /> : <FiChevronLeft />}
           </button>
@@ -88,12 +96,12 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
         {!collapsed && (
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-editor-text-dim uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-editor-text-dim dark:text-editor-text-dim uppercase tracking-wider">
                 Workspaces
               </h3>
               <button
                 onClick={handleCreateWorkspace}
-                className="p-1 rounded hover:bg-editor-hover text-editor-text-dim hover:text-editor-text transition-colors"
+                className="p-1 rounded hover:bg-editor-hover dark:hover:bg-editor-hover text-editor-text-dim dark:text-editor-text-dim hover:text-editor-text dark:hover:text-editor-text transition-colors"
                 title="Create workspace"
               >
                 <FiPlus size={14} />
@@ -117,7 +125,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
               ))}
               
               {workspaces.length === 0 && (
-                <p className="text-xs text-editor-text-dim text-center py-2">
+                <p className="text-xs text-editor-text-dim dark:text-editor-text-dim text-center py-2">
                   No workspaces yet
                 </p>
               )}
@@ -127,7 +135,7 @@ const Sidebar = ({ collapsed, onToggleCollapse }) => {
       </nav>
 
       {/* Footer */}
-      <div className="p-2 border-t border-editor-border">
+      <div className="p-2 border-t border-editor-border dark:border-editor-border">
         <button
           onClick={handleLogout}
           className="sidebar-item flex items-center space-x-3 rounded-lg w-full text-red-400 hover:text-red-300 hover:bg-red-900/20"

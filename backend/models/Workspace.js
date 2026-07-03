@@ -16,6 +16,10 @@ const workspaceSchema = new mongoose.Schema({
     type: String,
     maxlength: [500, 'Description cannot be more than 500 characters']
   },
+  files: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'File'
+  }],
   settings: {
     theme: {
       type: String,

@@ -16,6 +16,7 @@ import AppLoading from './components/AppLoading';
 const LoginPage = lazy(() => import('./pages/LoginPage').catch(() => ({ default: () => <FallbackComponent componentName="LoginPage" /> })));
 const RegisterPage = lazy(() => import('./pages/RegisterPage').catch(() => ({ default: () => <FallbackComponent componentName="RegisterPage" /> })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').catch(() => ({ default: () => <FallbackComponent componentName="DashboardPage" /> })));
+const WorkspacesPage = lazy(() => import('./pages/WorkspacesPage').catch(() => ({ default: () => <FallbackComponent componentName="WorkspacesPage" /> })));
 const WorkspacePage = lazy(() => import('./pages/WorkspacePage').catch(() => ({ default: () => <FallbackComponent componentName="WorkspacePage" /> })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').catch(() => ({ default: () => <FallbackComponent componentName="SettingsPage" /> })));
 
@@ -60,12 +61,16 @@ function App() {
         />
         
         <Routes>
-          {/* Direct IDE Route - Bypass auth for development */}
-          <Route path="/" element={<MainLayout />}>
+          {/* Protected Routes */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }>
             <Route index element={
               <ErrorBoundary>
                 <Suspense fallback={<AppLoading />}>
-                  <WorkspacePage />
+                  <DashboardPage />
                 </Suspense>
               </ErrorBoundary>
             } />
@@ -80,6 +85,13 @@ function App() {
               <ErrorBoundary>
                 <Suspense fallback={<AppLoading />}>
                   <DashboardPage />
+                </Suspense>
+              </ErrorBoundary>
+            } />
+            <Route path="workspaces" element={
+              <ErrorBoundary>
+                <Suspense fallback={<AppLoading />}>
+                  <WorkspacesPage />
                 </Suspense>
               </ErrorBoundary>
             } />
@@ -114,16 +126,16 @@ function App() {
           <Route
             path="*"
             element={
-              <div className="flex items-center justify-center h-screen bg-editor-bg">
+              <div className="flex items-center justify-center h-screen bg-editor-bg dark:bg-editor-bg">
                 <motion.div
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="text-center"
                 >
-                  <h1 className="text-4xl font-bold text-editor-text mb-4">
+                  <h1 className="text-4xl font-bold text-editor-text dark:text-editor-text mb-4">
                     404
                   </h1>
-                  <p className="text-editor-text-dim mb-8">
+                  <p className="text-editor-text-dim dark:text-editor-text-dim mb-8">
                     Page not found
                   </p>
                   <a

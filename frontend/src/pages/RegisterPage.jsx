@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { FiMail, FiLock, FiUser, FiEye, FiEyeOff, FiCheck, FiX } from 'react-icons/fi';
 import useAuthStore from '../store/authStore';
 import { validatePassword, isValidEmail } from '../utils/helpers';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -74,14 +75,13 @@ const RegisterPage = () => {
   const passwordStrength = validatePassword(formData.password);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-editor-bg px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
-        <div className="panel">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full max-w-md"
+    >
+      <div className="panel">
           <div className="panel-header">
             <h1 className="text-2xl font-bold text-gradient">Create Account</h1>
             <p className="text-editor-text-dim mt-2">Join the AI coding revolution</p>
@@ -255,7 +255,7 @@ const RegisterPage = () => {
             <div className="mt-6 text-center">
               <p className="text-sm text-editor-text-dim">
                 Already have an account?{' '}
-                <Link to="/login" className="text-editor-accent hover:text-blue-400">
+                <Link to="/auth/login" className="text-editor-accent hover:text-blue-400">
                   Sign in
                 </Link>
               </p>
@@ -263,7 +263,6 @@ const RegisterPage = () => {
           </div>
         </div>
       </motion.div>
-    </div>
   );
 };
 

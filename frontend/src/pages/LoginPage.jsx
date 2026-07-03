@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { FiMail, FiLock, FiEye, FiEyeOff, FiGithub, FiChrome } from 'react-icons/fi';
 import useAuthStore from '../store/authStore';
+import { isValidEmail } from '../utils/helpers';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({
@@ -34,6 +36,11 @@ const LoginPage = () => {
       return;
     }
 
+    if (!isValidEmail(formData.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     setIsLoading(true);
     
     const result = await login(formData.email, formData.password);
@@ -49,14 +56,13 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-editor-bg px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
-        <div className="panel">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full max-w-md"
+    >
+      <div className="panel">
           <div className="panel-header">
             <h1 className="text-2xl font-bold text-gradient">Welcome Back</h1>
             <p className="text-editor-text-dim mt-2">Sign in to your account</p>
@@ -96,6 +102,7 @@ const LoginPage = () => {
                     className="input-field pl-10 pr-10 w-full"
                     placeholder="Enter your password"
                     autoComplete="current-password"
+                    style={{ color: '#cccccc' }}
                   />
                   <button
                     type="button"
@@ -169,7 +176,7 @@ const LoginPage = () => {
             <div className="mt-6 text-center">
               <p className="text-sm text-editor-text-dim">
                 Don't have an account?{' '}
-                <Link to="/register" className="text-editor-accent hover:text-blue-400">
+                <Link to="/auth/register" className="text-editor-accent hover:text-blue-400">
                   Sign up
                 </Link>
               </p>
@@ -177,7 +184,6 @@ const LoginPage = () => {
           </div>
         </div>
       </motion.div>
-    </div>
   );
 };
 

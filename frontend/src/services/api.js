@@ -5,6 +5,8 @@ import debug, { setupApiDebugging } from '../utils/debug';
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   timeout: 5000, // Increased timeout to allow proper response
+  // Allow sending cookies (httpOnly token) from the browser
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,92 +14,6 @@ const api = axios.create({
 
 // Setup debugging
 setupApiDebugging(api);
-
-// Mock data for development when backend is not available
-const mockData = {
-  files: [
-    {
-      _id: '1',
-      name: 'App.jsx',
-      path: '/src/App.jsx',
-      language: 'javascript',
-      content: `import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import './App.css';
-
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Welcome to Cursor Clone</h1>
-        <p>Your AI-powered code editor</p>
-      </header>
-    </div>
-  );
-}
-
-export default App;`,
-      isFolder: false,
-      workspaceId: 'default'
-    },
-    {
-      _id: '2',
-      name: 'index.js',
-      path: '/src/index.js',
-      language: 'javascript',
-      content: `import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);`,
-      isFolder: false,
-      workspaceId: 'default'
-    },
-    {
-      _id: '3',
-      name: 'styles.css',
-      path: '/src/styles.css',
-      language: 'css',
-      content: `.App {
-  text-align: center;
-}
-
-.App-header {
-  background-color: #282c34;
-  padding: 20px;
-  color: white;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-}
-
-.App-header h1 {
-  margin-bottom: 16px;
-}
-
-.App-header p {
-  font-size: 16px;
-  opacity: 0.8;
-}`,
-      isFolder: false,
-      workspaceId: 'default'
-    }
-  ],
-  workspace: {
-    _id: 'default',
-    name: 'Default Workspace',
-    description: 'Your AI-powered coding environment',
-    lastAccessed: new Date().toISOString()
-  }
-};
 
 // Request interceptor to add auth token
 api.interceptors.request.use(
@@ -129,7 +45,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Unauthorized - clear auth and redirect to login
       localStorage.removeItem('auth-storage');
-      window.location.href = '/login';
+      window.location.href = '/auth/login';
     }
     
     return Promise.reject(error);
@@ -147,230 +63,82 @@ export const authAPI = {
 
 export const workspaceAPI = {
   getWorkspaces: async () => {
-    // Always return mock data for development to avoid auth issues
-    return { data: { data: [mockData.workspace] } };
+    return await api.get('/workspaces');
   },
   getWorkspace: async (id) => {
-    // Always return mock data for development to avoid auth issues
-    return { data: { data: { ...mockData.workspace, _id: id || 'default' } } };
+    return await api.get(`/workspaces/${id}`);
   },
   createWorkspace: async (data) => {
-    try {
-      return await api.post('/workspaces', data);
-    } catch (error) {
-      const newWorkspace = {
-        _id: Date.now().toString(),
-        ...data,
-        lastAccessed: new Date().toISOString()
-      };
-      return { data: { data: newWorkspace } };
-    }
+    return await api.post('/workspaces', data);
   },
   updateWorkspace: async (id, data) => {
-    try {
-      return await api.put(`/workspaces/${id}`, data);
-    } catch (error) {
-      return { data: { data: { ...mockData.workspace, ...data } } };
-    }
+    return await api.put(`/workspaces/${id}`, data);
   },
   deleteWorkspace: async (id) => {
-    try {
-      return await api.delete(`/workspaces/${id}`);
-    } catch (error) {
-      return { data: { success: true } };
-    }
+    return await api.delete(`/workspaces/${id}`);
   },
   getWorkspaceStats: async (id) => {
-    try {
-      return await api.get(`/workspaces/${id}/stats`);
-    } catch (error) {
-      return { data: { data: { files: mockData.files.length, lastAccessed: new Date().toISOString() } } };
-    }
+    return await api.get(`/workspaces/${id}/stats`);
   },
 };
 
 export const fileAPI = {
   getWorkspaceFiles: async (workspaceId) => {
-    // Always return mock data for development to avoid auth issues
-    console.log('📁 Loading mock files for workspace:', workspaceId);
-    return { data: { data: mockData.files } };
+    return await api.get(`/files/workspace/${workspaceId}`);
   },
   getFile: async (id) => {
-    try {
-      return await api.get(`/files/${id}`);
-    } catch (error) {
-      const file = mockData.files.find(f => f._id === id);
-      return { data: { data: file } };
-    }
+    return await api.get(`/files/${id}`);
   },
   createFile: async (data) => {
-    try {
-      return await api.post('/files', data);
-    } catch (error) {
-      const newFile = {
-        _id: Date.now().toString(),
-        ...data,
-        workspaceId: data.workspaceId || 'default'
-      };
-      mockData.files.push(newFile);
-      return { data: { data: newFile } };
-    }
+    return await api.post('/files', data);
   },
   updateFile: async (id, fileData) => {
-    try {
-      return await api.put(`/files/${id}`, fileData);
-    } catch (error) {
-      const fileIndex = mockData.files.findIndex(f => f._id === id);
-      if (fileIndex !== -1) {
-        mockData.files[fileIndex] = { ...mockData.files[fileIndex], ...fileData };
-        return { data: { data: mockData.files[fileIndex] } };
-      }
-      throw error;
-    }
+    return await api.put(`/files/${id}`, fileData);
   },
   deleteFile: async (id) => {
-    try {
-      return await api.delete(`/files/${id}`);
-    } catch (error) {
-      const fileIndex = mockData.files.findIndex(f => f._id === id);
-      if (fileIndex !== -1) {
-        mockData.files.splice(fileIndex, 1);
-        return { data: { success: true } };
-      }
-      throw error;
-    }
+    return await api.delete(`/files/${id}`);
   },
   renameFile: async (id, name) => {
-    try {
-      return await api.put(`/files/${id}/rename`, { name });
-    } catch (error) {
-      const fileIndex = mockData.files.findIndex(f => f._id === id);
-      if (fileIndex !== -1) {
-        mockData.files[fileIndex].name = name;
-        return { data: { data: mockData.files[fileIndex] } };
-      }
-      throw error;
-    }
+    return await api.put(`/files/${id}/rename`, { name });
+  },
+  moveFile: async (id, newParentId) => {
+    return await api.put(`/files/${id}/move`, { newParentId });
   },
 };
 
 export const aiAPI = {
   chat: async (data) => {
-    try {
-      return await api.post('/ai/chat', data);
-    } catch (error) {
-      // Mock AI response
-      return { 
-        data: { 
-          data: {
-            _id: Date.now().toString(),
-            role: 'assistant',
-            content: `I understand you want to: ${data.message}. This is a mock AI response since the backend is not connected. In a real implementation, I would provide helpful coding assistance.`,
-            timestamp: new Date().toISOString()
-          }
-        } 
-      };
-    }
+    return await api.post('/ai/chat', data);
   },
   generateCode: async (data) => {
-    try {
-      return await api.post('/ai/generate', data);
-    } catch (error) {
-      return { 
-        data: { 
-          code: `// Generated code for: ${data.description}\nfunction example() {\n  console.log('This is mock generated code');\n  return 'Hello World';\n}` 
-        } 
-      };
-    }
+    return await api.post('/ai/generate', data);
   },
   explainCode: async (data) => {
-    try {
-      return await api.post('/ai/explain', data);
-    } catch (error) {
-      return { 
-        data: { 
-          explanation: `This is a mock explanation of the code. The code appears to be a ${data.language} implementation that performs certain operations.` 
-        } 
-      };
-    }
+    return await api.post('/ai/explain', data);
   },
   refactorCode: async (data) => {
-    try {
-      return await api.post('/ai/refactor', data);
-    } catch (error) {
-      return { 
-        data: { 
-          refactoredCode: data.code + '\n// Refactored code (mock)' 
-        } 
-      };
-    }
+    return await api.post('/ai/refactor', data);
   },
   fixBugs: async (data) => {
-    try {
-      return await api.post('/ai/fix-bugs', data);
-    } catch (error) {
-      return { 
-        data: { 
-          fix: data.code + '\n// Fixed code (mock)' 
-        } 
-      };
-    }
+    return await api.post('/ai/fix-bugs', data);
   },
   codeCompletion: async (data) => {
-    try {
-      return await api.post('/ai/complete', data);
-    } catch (error) {
-      return { 
-        data: { 
-          suggestions: ['console.log()', 'return', 'function', 'const'] 
-        } 
-      };
-    }
+    return await api.post('/ai/complete', data);
   },
   reviewCode: async (data) => {
-    try {
-      return await api.post('/ai/review', data);
-    } catch (error) {
-      return { 
-        data: { 
-          review: 'Code looks good! This is a mock review since backend is not connected.' 
-        } 
-      };
-    }
+    return await api.post('/ai/review', data);
   },
   getChatHistory: async (workspaceId) => {
-    try {
-      return await api.get(`/ai/chats/${workspaceId}`);
-    } catch (error) {
-      return { data: { data: [] } };
-    }
+    return await api.get(`/ai/chats/${workspaceId}`);
   },
   getChat: async (workspaceId, chatId) => {
-    try {
-      return await api.get(`/ai/chats/${workspaceId}/${chatId}`);
-    } catch (error) {
-      return { data: { data: null } };
-    }
+    return await api.get(`/ai/chats/${workspaceId}/${chatId}`);
   },
   deleteChat: async (workspaceId, chatId) => {
-    try {
-      return await api.delete(`/ai/chats/${workspaceId}/${chatId}`);
-    } catch (error) {
-      return { data: { success: true } };
-    }
+    return await api.delete(`/ai/chats/${workspaceId}/${chatId}`);
   },
   getModelInfo: async () => {
-    try {
-      return await api.get('/ai/model-info');
-    } catch (error) {
-      return { 
-        data: { 
-          model: 'Cursor-AI-Mock',
-          version: '1.0.0',
-          capabilities: ['code-generation', 'explanation', 'refactoring']
-        } 
-      };
-    }
+    return await api.get('/ai/model-info');
   },
 };
 

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body } = require('express-validator');
 const {
   getWorkspaceFiles,
@@ -48,8 +49,13 @@ const createFileValidation = [
     .withMessage('isFolder must be a boolean'),
   body('parentId')
     .optional()
-    .isMongoId()
-    .withMessage('Parent ID must be a valid MongoDB ID')
+    .custom((value) => {
+      if (value === null || value === '') return true;
+      if (!mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Parent ID must be a valid MongoDB ID');
+      }
+      return true;
+    })
 ];
 
 const updateFileValidation = [
@@ -98,8 +104,13 @@ const renameFileValidation = [
 const moveFileValidation = [
   body('newParentId')
     .optional()
-    .isMongoId()
-    .withMessage('Parent ID must be a valid MongoDB ID')
+    .custom((value) => {
+      if (value === null || value === '') return true;
+      if (!mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Parent ID must be a valid MongoDB ID');
+      }
+      return true;
+    })
 ];
 
 // Routes
