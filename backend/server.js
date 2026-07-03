@@ -26,7 +26,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "http://localhost:5173" || "https://cursor-clone-delta-orpin.vercel.app/",
     methods: ["GET", "POST"],
     credentials: true
   }
