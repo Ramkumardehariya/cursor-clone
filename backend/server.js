@@ -29,6 +29,8 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:5173",
   "http://localhost:5174",
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
   "https://cursor-clone-delta-orpin.vercel.app"
 ].filter(Boolean);
 
@@ -47,16 +49,6 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 
-// Middleware - CORS must come before rate limiter to handle preflight requests
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  process.env.FRONTEND_URL,
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-  'https://cursor-clone-delta-orpin.vercel.app'
-].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
